@@ -1,7 +1,7 @@
 {
   "name": "slack-for-vscode",
   "displayName": "Slack for VSCode",
-  "description": "",
+  "description": "Use Slack inside VS Code",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.109.0"
@@ -12,12 +12,41 @@
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "slack",
+          "title": "Slack",
+          "icon": "$(feedback)"
+        }
+      ]
+    },
+    "views": {
+      "slack": [
+        {
+          "id": "slackChannels",
+          "name": "Channels",
+          "icon": "$(feedback)",
+          "contextualTitle": "Slack"
+        }
+      ]
+    },
     "commands": [
       {
-        "command": "slack-for-vscode.helloWorld",
-        "title": "Hello World"
+        "command": "slack-for-vscode.refreshChannels",
+        "title": "Refresh Channels",
+        "icon": "$(refresh)"
       }
-    ]
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "slack-for-vscode.refreshChannels",
+          "when": "view == slackChannels",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
