@@ -33,17 +33,37 @@
     },
     "commands": [
       {
+        "command": "slack-for-vscode.setToken",
+        "title": "Slack: Set Token",
+        "icon": "$(key)"
+      },
+      {
+        "command": "slack-for-vscode.clearToken",
+        "title": "Slack: Clear Token",
+        "icon": "$(trash)"
+      },
+      {
         "command": "slack-for-vscode.refreshChannels",
-        "title": "Refresh Channels",
+        "title": "Slack: Refresh Channels",
         "icon": "$(refresh)"
       }
     ],
     "menus": {
       "view/title": [
         {
+          "command": "slack-for-vscode.setToken",
+          "when": "view == slackChannels",
+          "group": "navigation@1"
+        },
+        {
           "command": "slack-for-vscode.refreshChannels",
           "when": "view == slackChannels",
-          "group": "navigation"
+          "group": "navigation@2"
+        },
+        {
+          "command": "slack-for-vscode.clearToken",
+          "when": "view == slackChannels",
+          "group": "overflow"
         }
       ]
     }
