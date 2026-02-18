@@ -17,7 +17,7 @@
         {
           "id": "slack",
           "title": "Slack",
-          "icon": "$(comment-discussion)"
+          "icon": "$(feedback)"
         }
       ]
     },
@@ -26,7 +26,7 @@
         {
           "id": "slackChannels",
           "name": "Channels",
-          "icon": "$(comment-discussion)",
+          "icon": "$(feedback)",
           "contextualTitle": "Slack"
         }
       ]

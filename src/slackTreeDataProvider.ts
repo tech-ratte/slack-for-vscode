@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-type ChannelType = 'section' | 'channel' | 'dm';
+type ChannelType = 'channels' | 'dms' | 'public' | 'private' | 'dm';
 
 export class SlackItem extends vscode.TreeItem {
   constructor(
@@ -14,20 +14,24 @@ export class SlackItem extends vscode.TreeItem {
     this.contextValue = type;
 
     switch (type) {
-      case 'section':
-        this.iconPath = new vscode.ThemeIcon('chevron-down');
+      case 'channels':
+        this.iconPath = new vscode.ThemeIcon('organization');
         break;
-      case 'channel':
-        this.iconPath = new vscode.ThemeIcon(
-          unreadCount > 0 ? 'comment-unresolved' : 'comment',
-        );
+      case 'dms':
+        this.iconPath = new vscode.ThemeIcon('comment-discussion');
+        break;
+      case 'public':
+        this.iconPath = new vscode.ThemeIcon('comment');
         this.description = unreadCount > 0 ? `${unreadCount}` : '';
-        this.tooltip = `#${label}${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`;
+        this.tooltip = `＃ ${label}${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`;
+        break;
+      case 'private':
+        this.iconPath = new vscode.ThemeIcon('lock');
+        this.description = unreadCount > 0 ? `${unreadCount}` : '';
+        this.tooltip = `🔒 ${label}${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`;
         break;
       case 'dm':
-        this.iconPath = new vscode.ThemeIcon(
-          unreadCount > 0 ? 'person' : 'person-outline',
-        );
+        this.iconPath = new vscode.ThemeIcon('account');
         this.description = unreadCount > 0 ? `${unreadCount}` : '';
         this.tooltip = `DM: ${label}${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`;
         break;
@@ -37,6 +41,7 @@ export class SlackItem extends vscode.TreeItem {
 
 interface MockChannel {
   name: string;
+  type: ChannelType;
   unread: number;
 }
 
@@ -46,12 +51,12 @@ interface MockDM {
 }
 
 const MOCK_CHANNELS: MockChannel[] = [
-  { name: 'general', unread: 3 },
-  { name: 'random', unread: 0 },
-  { name: 'dev-team', unread: 12 },
-  { name: 'design', unread: 0 },
-  { name: 'announcements', unread: 1 },
-  { name: 'help-desk', unread: 0 },
+  { name: 'general', type: 'public', unread: 3 },
+  { name: 'random', type: 'public', unread: 0 },
+  { name: 'dev-team', type: 'private', unread: 12 },
+  { name: 'design', type: 'private', unread: 0 },
+  { name: 'announcements', type: 'private', unread: 1 },
+  { name: 'help-desk', type: 'private', unread: 0 },
 ];
 
 const MOCK_DMS: MockDM[] = [
@@ -77,8 +82,8 @@ export class SlackTreeDataProvider implements vscode.TreeDataProvider<SlackItem>
     if (!element) {
       // Root level: return section headers
       return [
-        new SlackItem('Channels', 'section', vscode.TreeItemCollapsibleState.Expanded),
-        new SlackItem('Direct Messages', 'section', vscode.TreeItemCollapsibleState.Expanded),
+        new SlackItem('Channels', 'channels', vscode.TreeItemCollapsibleState.Expanded),
+        new SlackItem('Direct Messages', 'dms', vscode.TreeItemCollapsibleState.Expanded),
       ];
     }
 
@@ -86,8 +91,8 @@ export class SlackTreeDataProvider implements vscode.TreeDataProvider<SlackItem>
       return MOCK_CHANNELS.map(
         (ch) =>
           new SlackItem(
-            `#${ch.name}`,
-            'channel',
+            `${ch.name}`,
+            ch.type,
             vscode.TreeItemCollapsibleState.None,
             ch.unread,
           ),
