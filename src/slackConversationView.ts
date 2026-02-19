@@ -247,6 +247,10 @@ export class SlackConversationView {
       document.getElementById('refresh')?.addEventListener('click', () => {
         vscode.postMessage({ type: 'refresh' });
       });
+      function scrollToBottom() {
+        window.scrollTo(0, document.body.scrollHeight);
+      }
+      window.onload = scrollToBottom;
     </script>
   </body>
 </html>`;
