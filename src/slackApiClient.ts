@@ -16,6 +16,23 @@ export interface SlackDM {
   unread_count?: number;
 }
 
+export interface SlackMessage {
+  type?: string;
+  subtype?: string;
+  user?: string;
+  username?: string;
+  bot_id?: string;
+  text?: string;
+  reactions?: SlackReaction[];
+  ts: string;
+}
+
+export interface SlackReaction {
+  name: string;
+  count: number;
+  users?: string[];
+}
+
 interface SlackApiResponse<T> {
   ok: boolean;
   error?: string;
@@ -23,6 +40,7 @@ interface SlackApiResponse<T> {
   provided?: string;
   channels?: T[];
   ims?: T[];
+  messages?: T[];
   user?: { id: string; name: string; real_name: string; profile: { display_name: string; real_name: string } };
   members?: string[];
   response_metadata?: { next_cursor?: string };
@@ -172,5 +190,17 @@ export class SlackApiClient {
     }
     const profile = res.user.profile;
     return profile.display_name || profile.real_name || res.user.name || userId;
+  }
+
+  /** Fetch recent messages for a channel/DM by conversation ID. */
+  async getConversationHistory(conversationId: string, limit: number = 50): Promise<SlackMessage[]> {
+    const res = await this.call<SlackMessage>('conversations.history', {
+      channel: conversationId,
+      limit: String(limit),
+    });
+    if (!res.ok) {
+      throw new Error(explainError(res.error ?? 'unknown', res.needed));
+    }
+    return res.messages ?? [];
   }
 }

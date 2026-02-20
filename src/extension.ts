@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { SlackAuthManager } from './slackAuthManager';
+import { ConversationTarget, SlackConversationView } from './slackConversationView';
 import { SlackTreeDataProvider } from './slackTreeDataProvider';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -7,6 +8,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   const authManager = new SlackAuthManager(context.secrets);
   const slackProvider = new SlackTreeDataProvider(authManager);
+  const conversationView = new SlackConversationView(authManager);
 
   const treeView = vscode.window.createTreeView('slackChannels', {
     treeDataProvider: slackProvider,
@@ -67,7 +69,23 @@ export function activate(context: vscode.ExtensionContext) {
     },
   );
 
-  context.subscriptions.push(treeView, setTokenCommand, clearTokenCommand, refreshCommand);
+  const openConversationCommand = vscode.commands.registerCommand(
+    'slack-for-vscode.openConversation',
+    async (target: ConversationTarget | undefined) => {
+      if (!target?.id) {
+        return;
+      }
+      await conversationView.open(target);
+    },
+  );
+
+  context.subscriptions.push(
+    treeView,
+    setTokenCommand,
+    clearTokenCommand,
+    refreshCommand,
+    openConversationCommand,
+  );
 }
 
 export function deactivate() {}

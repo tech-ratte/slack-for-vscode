@@ -10,6 +10,7 @@ export class SlackItem extends vscode.TreeItem {
     public readonly type: ChannelType,
     public readonly collapsibleState: vscode.TreeItemCollapsibleState,
     public readonly unreadCount: number = 0,
+    public readonly conversationId?: string,
   ) {
     super(label, collapsibleState);
 
@@ -26,16 +27,37 @@ export class SlackItem extends vscode.TreeItem {
         this.iconPath = new vscode.ThemeIcon('comment');
         this.description = unreadCount > 0 ? `${unreadCount}` : '';
         this.tooltip = `＃ ${label}${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`;
+        if (conversationId) {
+          this.command = {
+            command: 'slack-for-vscode.openConversation',
+            title: 'Open Conversation',
+            arguments: [{ id: conversationId, label, kind: 'channel' as const }],
+          };
+        }
         break;
       case 'private':
         this.iconPath = new vscode.ThemeIcon('lock');
         this.description = unreadCount > 0 ? `${unreadCount}` : '';
         this.tooltip = `🔒 ${label}${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`;
+        if (conversationId) {
+          this.command = {
+            command: 'slack-for-vscode.openConversation',
+            title: 'Open Conversation',
+            arguments: [{ id: conversationId, label, kind: 'channel' as const }],
+          };
+        }
         break;
       case 'dm':
         this.iconPath = new vscode.ThemeIcon('account');
         this.description = unreadCount > 0 ? `${unreadCount}` : '';
         this.tooltip = `DM: ${label}${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`;
+        if (conversationId) {
+          this.command = {
+            command: 'slack-for-vscode.openConversation',
+            title: 'Open Conversation',
+            arguments: [{ id: conversationId, label, kind: 'dm' as const }],
+          };
+        }
         break;
       case 'info':
         this.iconPath = new vscode.ThemeIcon('info');
@@ -111,6 +133,7 @@ export class SlackTreeDataProvider implements vscode.TreeDataProvider<SlackItem>
           ch.is_private ? 'private' : 'public',
           vscode.TreeItemCollapsibleState.None,
           ch.unread_count ?? 0,
+          ch.id,
         ),
       );
     }
@@ -122,6 +145,7 @@ export class SlackTreeDataProvider implements vscode.TreeDataProvider<SlackItem>
           'dm',
           vscode.TreeItemCollapsibleState.None,
           dm.unread_count ?? 0,
+          dm.id,
         ),
       );
     }
