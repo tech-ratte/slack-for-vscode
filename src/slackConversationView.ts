@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { SlackApiClient, SlackMessage } from './slackApiClient';
+import { SlackApiClient, SlackMessage, SlackReaction } from './slackApiClient';
 import { SlackAuthManager } from './slackAuthManager';
 
 export type ConversationKind = 'channel' | 'dm';
@@ -225,6 +225,22 @@ export class SlackConversationView {
         word-break: break-word;
       }
 
+      .reactions {
+        margin-top: 8px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .reaction {
+        font-size: 12px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+        color: var(--muted);
+        background: color-mix(in srgb, var(--bg) 90%, black);
+      }
+
       .error {
         color: var(--error);
         padding: 12px;
@@ -268,12 +284,28 @@ export class SlackConversationView {
         const who = this.getDisplayName(m);
         const when = formatSlackTs(m.ts);
         const text = m.text ?? '';
+        const reactions = this.renderReactions(m.reactions);
         return `<div class="msg">
   <div class="meta">${escapeHtml(who)} · ${escapeHtml(when)}</div>
   <div class="text">${escapeHtml(text)}</div>
+  ${reactions}
 </div>`;
       })
       .join('\n');
+  }
+
+  private renderReactions(reactions: SlackReaction[] | undefined): string {
+    const list = (reactions ?? []).filter((r) => r?.name && typeof r.count === 'number' && r.count > 0);
+    if (list.length === 0) {
+      return '';
+    }
+
+    const nodes = list
+      .slice(0, 24)
+      .map((r) => `<span class="reaction">:${escapeHtml(r.name)}: ${r.count}</span>`)
+      .join('');
+
+    return `<div class="reactions">${nodes}</div>`;
   }
 
   private getDisplayName(m: SlackMessage): string {

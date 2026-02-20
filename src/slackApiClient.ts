@@ -23,7 +23,14 @@ export interface SlackMessage {
   username?: string;
   bot_id?: string;
   text?: string;
+  reactions?: SlackReaction[];
   ts: string;
+}
+
+export interface SlackReaction {
+  name: string;
+  count: number;
+  users?: string[];
 }
 
 interface SlackApiResponse<T> {
