@@ -41,6 +41,7 @@ interface SlackApiResponse<T> {
   channels?: T[];
   ims?: T[];
   messages?: T[];
+  message?: unknown;
   user?: { id: string; name: string; real_name: string; profile: { display_name: string; real_name: string } };
   members?: string[];
   response_metadata?: { next_cursor?: string };
@@ -202,5 +203,16 @@ export class SlackApiClient {
       throw new Error(explainError(res.error ?? 'unknown', res.needed));
     }
     return res.messages ?? [];
+  }
+
+  /** Send a message to a channel/DM by conversation ID. */
+  async postMessage(conversationId: string, text: string): Promise<void> {
+    const res = await this.call<never>('chat.postMessage', {
+      channel: conversationId,
+      text,
+    });
+    if (!res.ok) {
+      throw new Error(explainError(res.error ?? 'unknown', res.needed));
+    }
   }
 }
