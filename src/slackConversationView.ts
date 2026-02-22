@@ -383,7 +383,7 @@ export class SlackConversationView {
       <button id="send" ${options?.canSend ? '' : 'disabled'}>Send</button>
       <div class="composer-meta">
         <div class="compose-error" id="composeError"></div>
-        <div id="composeHint">${options?.canSend ? 'Enter: send · Shift+Enter: newline' : ''}</div>
+        <div id="composeHint">${options?.canSend ? '【newline】Enter /【send】Ctrl + Enter' : ''}</div>
       </div>
     </div>
     <script nonce="${nonce}">
@@ -426,7 +426,8 @@ export class SlackConversationView {
 
       sendBtn?.addEventListener('click', sendCurrent);
       textarea?.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        const isModifierPressed = e.ctrlKey || e.metaKey;
+        if (e.key === 'Enter' && isModifierPressed) {
           e.preventDefault();
           sendCurrent();
         }
