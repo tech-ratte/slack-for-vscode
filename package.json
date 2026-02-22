@@ -34,17 +34,20 @@
     "commands": [
       {
         "command": "slack-for-vscode.setToken",
-        "title": "Slack: Set Token",
+        "title": "Set Token",
+        "category": "Slack",
         "icon": "$(key)"
       },
       {
         "command": "slack-for-vscode.clearToken",
-        "title": "Slack: Clear Token",
+        "title": "Clear Token",
+        "category": "Slack",
         "icon": "$(trash)"
       },
       {
         "command": "slack-for-vscode.refreshChannels",
-        "title": "Slack: Refresh Channels",
+        "title": "Refresh Channels",
+        "category": "Slack",
         "icon": "$(refresh)"
       }
     ],
