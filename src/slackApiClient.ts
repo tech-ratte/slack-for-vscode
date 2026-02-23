@@ -124,6 +124,30 @@ export class SlackApiClient {
     };
   }
 
+  /** Fetch unread_count for a single conversation.
+   *  Strategy: conversations.info gives us last_read timestamp,
+   *  then conversations.history counts messages after that timestamp. */
+  private async getConversationUnreadCount(channelId: string): Promise<number> {
+    try {
+      // Step 1: get last_read timestamp
+      const infoRes = await this.call<never>('conversations.info', { channel: channelId });
+      const lastRead = (infoRes as unknown as { channel?: { last_read?: string } }).channel?.last_read ?? '0';
+
+      // Step 2: count messages after last_read
+      const histRes = await this.call<SlackMessage>('conversations.history', {
+        channel: channelId,
+        oldest: lastRead,
+        limit: '200',
+        inclusive: 'false',
+      });
+      if (!histRes.ok) { return 0; }
+      // Exclude system messages (channel_join etc.) — only count real messages
+      return (histRes.messages ?? []).filter((m) => !m.subtype).length;
+    } catch {
+      return 0;
+    }
+  }
+
   /** Fetch all public + private channels the user is a member of. */
   async getChannels(): Promise<SlackChannel[]> {
     const results: SlackChannel[] = [];
@@ -149,6 +173,14 @@ export class SlackApiClient {
       cursor = res.response_metadata?.next_cursor ?? '';
     } while (cursor);
 
+    // conversations.list does not return unread_count; fetch it per channel.
+    await Promise.all(
+      results.map(async (ch) => {
+        ch.unread_count = await this.getConversationUnreadCount(ch.id);
+      }),
+    );
+    console.log(results);
+
     return results;
   }
 
@@ -171,13 +203,20 @@ export class SlackApiClient {
       if (!res.ok) {
         throw new Error(explainError(res.error ?? 'unknown', res.needed));
       }
-
+      console.log(res);
       for (const im of res.channels ?? []) {
         results.push({ id: im.id, user: im.user, unread_count: im.unread_count });
       }
 
       cursor = res.response_metadata?.next_cursor ?? '';
     } while (cursor);
+
+    // conversations.list does not return unread_count for IMs; fetch it per DM.
+    await Promise.all(
+      results.map(async (dm) => {
+        dm.unread_count = await this.getConversationUnreadCount(dm.id);
+      }),
+    );
 
     return results;
   }
