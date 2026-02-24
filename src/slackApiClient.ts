@@ -125,25 +125,52 @@ export class SlackApiClient {
   }
 
   /** Fetch unread_count for a single conversation.
-   *  Strategy: conversations.info gives us last_read timestamp,
-   *  then conversations.history counts messages after that timestamp. */
+   *  Strategy: conversations.info gives us unread_count (if scopes allow)
+   *  or last_read timestamp, then we count messages after that. */
   private async getConversationUnreadCount(channelId: string): Promise<number> {
     try {
-      // Step 1: get last_read timestamp
-      const infoRes = await this.call<never>('conversations.info', { channel: channelId });
-      const lastRead = (infoRes as unknown as { channel?: { last_read?: string } }).channel?.last_read ?? '0';
+      // Step 1: get info (include_num_members can sometimes trigger unread_count return in some API versions)
+      const infoRes = await this.call<never>('conversations.info', {
+        channel: channelId,
+        include_num_members: 'true',
+      });
+
+      if (!infoRes.ok) {
+        console.error(`[SlackApiClient] conversations.info failed for ${channelId}:`, infoRes.error);
+        return 0;
+      }
+
+      const channelData = (infoRes as any).channel;
+
+      // Some tokens/scopes might return unread_count directly
+      if (typeof channelData?.unread_count === 'number') {
+        return channelData.unread_count;
+      }
+
+      const lastRead = channelData?.last_read;
+      if (!lastRead) {
+        // If we don't have last_read, we can't reliably calculate unread count via history
+        return 0;
+      }
 
       // Step 2: count messages after last_read
       const histRes = await this.call<SlackMessage>('conversations.history', {
         channel: channelId,
         oldest: lastRead,
-        limit: '200',
+        limit: '100', // Limit to 100 for performance
         inclusive: 'false',
       });
-      if (!histRes.ok) { return 0; }
+
+      if (!histRes.ok) {
+        console.error(`[SlackApiClient] conversations.history failed for ${channelId}:`, histRes.error);
+        return 0;
+      }
+
       // Exclude system messages (channel_join etc.) — only count real messages
-      return (histRes.messages ?? []).filter((m) => !m.subtype).length;
-    } catch {
+      const count = (histRes.messages ?? []).filter((m) => !m.subtype).length;
+      return count;
+    } catch (err) {
+      console.error(`[SlackApiClient] Error fetching unread count for ${channelId}:`, err);
       return 0;
     }
   }
@@ -179,7 +206,7 @@ export class SlackApiClient {
         ch.unread_count = await this.getConversationUnreadCount(ch.id);
       }),
     );
-    console.log(results);
+    console.log(`[SlackApiClient] Fetched ${results.length} channels with unread counts.`);
 
     return results;
   }
@@ -217,6 +244,7 @@ export class SlackApiClient {
         dm.unread_count = await this.getConversationUnreadCount(dm.id);
       }),
     );
+    console.log(`[SlackApiClient] Fetched ${results.length} DMs with unread counts.`);
 
     return results;
   }

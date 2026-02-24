@@ -77,7 +77,7 @@ export class SlackTreeDataProvider implements vscode.TreeDataProvider<SlackItem>
   private _loading = false;
   private _error: string | undefined;
 
-  constructor(private readonly authManager: SlackAuthManager) {}
+  constructor(private readonly authManager: SlackAuthManager) { }
 
   refresh(): void {
     this._loaded = false;
@@ -127,27 +127,29 @@ export class SlackTreeDataProvider implements vscode.TreeDataProvider<SlackItem>
     }
 
     if (element.label === 'Channels') {
-      return this._channels.map((ch) =>
-        new SlackItem(
+      return this._channels.map((ch) => {
+        const item = new SlackItem(
           ch.name,
           ch.is_private ? 'private' : 'public',
           vscode.TreeItemCollapsibleState.None,
           ch.unread_count ?? 0,
           ch.id,
-        ),
-      );
+        );
+        return item;
+      });
     }
 
     if (element.label === 'Direct Messages') {
-      return this._dms.map((dm) =>
-        new SlackItem(
+      return this._dms.map((dm) => {
+        const item = new SlackItem(
           dm.userName ?? dm.user,
           'dm',
           vscode.TreeItemCollapsibleState.None,
           dm.unread_count ?? 0,
           dm.id,
-        ),
-      );
+        );
+        return item;
+      });
     }
 
     return [];
