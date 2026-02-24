@@ -55,6 +55,12 @@
         "title": "Add DM",
         "category": "Slack",
         "icon": "$(person-add)"
+      },
+      {
+        "command": "slack-for-vscode.removeDm",
+        "title": "Remove DM",
+        "category": "Slack",
+        "icon": "$(trash)"
       }
     ],
     "menus": {
