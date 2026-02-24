@@ -240,6 +240,14 @@ export class SlackTreeDataProvider implements vscode.TreeDataProvider<SlackItem>
 
       const channels = await client.getChannels();
       this._channels = channels.sort((a, b) => a.name.localeCompare(b.name));
+
+      // Update unread counts for pinned DMs
+      if (this._pinnedDMs.length > 0) {
+        await withConcurrencyLimit(this._pinnedDMs, 5, async (dm: PinnedDM) => {
+          dm.unread_count = await client.getUnreadCount(dm.dmId);
+        });
+      }
+
       this._error = undefined;
     } catch (err) {
       this._error = `Error: ${err instanceof Error ? err.message : String(err)}`;
@@ -249,4 +257,27 @@ export class SlackTreeDataProvider implements vscode.TreeDataProvider<SlackItem>
       this._onDidChangeTreeData.fire();
     }
   }
+}
+
+/**
+ * Run async tasks with at most `limit` tasks running simultaneously.
+ * Results are returned in the same order as `items`.
+ */
+async function withConcurrencyLimit<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let index = 0;
+
+  async function worker(): Promise<void> {
+    while (index < items.length) {
+      const i = index++;
+      results[i] = await fn(items[i]);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
 }

@@ -192,7 +192,7 @@ export class SlackApiClient {
   async getChannels(): Promise<SlackChannel[]> {
     const channels = await this._listAllChannels();
     await withConcurrencyLimit(channels, 5, async (ch) => {
-      ch.unread_count = await this._fetchUnreadCount(ch.id);
+      ch.unread_count = await this.getUnreadCount(ch.id);
     });
     return channels;
   }
@@ -284,15 +284,27 @@ export class SlackApiClient {
     return res.message?.ts ?? '';
   }
 
+  private static warnedAboutMarkScope = false;
+
   async markAsRead(conversationId: string, ts: string): Promise<void> {
     try {
       await this.call('conversations.mark', { channel: conversationId, ts });
     } catch (err) {
+      if (err instanceof SlackError && err.code === 'missing_scope') {
+        if (!SlackApiClient.warnedAboutMarkScope) {
+          console.warn(
+            `[SlackApiClient] markAsRead functionality is disabled due to missing scope(s): ${err.needed}. ` +
+            'Automatic unread clearing will not work until these scopes are added to your Slack App.',
+          );
+          SlackApiClient.warnedAboutMarkScope = true;
+        }
+        return;
+      }
       console.error(`[SlackApiClient] conversations.mark failed for ${conversationId}:`, err);
     }
   }
 
-  private async _fetchUnreadCount(channelId: string): Promise<number> {
+  async getUnreadCount(channelId: string): Promise<number> {
     try {
       const infoRes = await this.call('conversations.info', { channel: channelId });
       const lastRead = infoRes.channel?.last_read;
