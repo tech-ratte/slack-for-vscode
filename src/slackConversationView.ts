@@ -475,7 +475,9 @@ export class SlackConversationView {
   }
 
   private renderMessages(messages: SlackMessage[]): string {
-    const ordered = [...messages].reverse(); // Slack returns newest first
+    // Exclude system messages (channel_join, etc.) to match unread count logic
+    const filtered = messages.filter((m) => !m.subtype);
+    const ordered = [...filtered].reverse(); // Slack returns newest first
 
     if (ordered.length === 0) {
       return `<div class="meta">No messages.</div>`;

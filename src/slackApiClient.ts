@@ -142,15 +142,11 @@ export class SlackApiClient {
       }
 
       const channelData = (infoRes as any).channel;
-
-      // Some tokens/scopes might return unread_count directly
-      if (typeof channelData?.unread_count === 'number') {
-        return channelData.unread_count;
-      }
-
       const lastRead = channelData?.last_read;
+
+      // If no last_read, we can't compute unread via history.
+      // We'll treat it as 0 to avoid showing unreads for channels never visited.
       if (!lastRead) {
-        // If we don't have last_read, we can't reliably calculate unread count via history
         return 0;
       }
 
