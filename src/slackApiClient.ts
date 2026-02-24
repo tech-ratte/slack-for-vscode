@@ -41,7 +41,18 @@ interface SlackApiResponse<T> {
   channels?: T[];
   ims?: T[];
   messages?: T[];
-  message?: unknown;
+  ts?: string;
+}
+
+interface SlackApiResponse<T> {
+  ok: boolean;
+  error?: string;
+  needed?: string;
+  provided?: string;
+  channels?: T[];
+  ims?: T[];
+  messages?: T[];
+  message?: { ts: string };
   user?: { id: string; name: string; real_name: string; profile: { display_name: string; real_name: string } };
   members?: string[];
   response_metadata?: { next_cursor?: string };
@@ -103,6 +114,10 @@ function explainError(error: string, needed?: string): string {
 
 export class SlackApiClient {
   private readonly baseUrl = 'https://slack.com/api';
+  private myUserId: string | undefined;
+
+  // Static cache to store the latest markAsRead timestamp per conversation ID.
+  private static lastReadCache = new Map<string, string>();
 
   constructor(private readonly token: string) { }
 
@@ -116,10 +131,12 @@ export class SlackApiClient {
   /** Verify the token is valid. Returns the workspace name on success. */
   async testAuth(): Promise<{ ok: boolean; team?: string; user?: string; error?: string; errorMessage?: string }> {
     const res = await this.call<never>('auth.test');
+    const authData = (res as unknown as { user_id?: string });
+    this.myUserId = authData.user_id;
     return {
       ok: res.ok,
       team: res.team,
-      user: (res as unknown as { user_id?: string }).user_id,
+      user: this.myUserId,
       error: res.error,
       errorMessage: res.error ? explainError(res.error, res.needed) : undefined,
     };
@@ -142,7 +159,13 @@ export class SlackApiClient {
       }
 
       const channelData = (infoRes as any).channel;
-      const lastRead = channelData?.last_read;
+      let lastRead = channelData?.last_read;
+
+      // Check if we have a newer locally cached last_read timestamp
+      const cachedLastRead = SlackApiClient.lastReadCache.get(channelId);
+      if (cachedLastRead && (!lastRead || cachedLastRead > lastRead)) {
+        lastRead = cachedLastRead;
+      }
 
       // If no last_read, we can't compute unread via history.
       // We'll treat it as 0 to avoid showing unreads for channels never visited.
@@ -163,8 +186,12 @@ export class SlackApiClient {
         return 0;
       }
 
-      // Exclude system messages (channel_join etc.) — only count real messages
-      const count = (histRes.messages ?? []).filter((m) => !m.subtype).length;
+      // Exclude system messages AND messages sent by the current user
+      const count = (histRes.messages ?? []).filter((m) => {
+        if (m.subtype) return false;
+        if (this.myUserId && m.user === this.myUserId) return false;
+        return true;
+      }).length;
       return count;
     } catch (err) {
       console.error(`[SlackApiClient] Error fetching unread count for ${channelId}:`, err);
@@ -267,14 +294,31 @@ export class SlackApiClient {
     return res.messages ?? [];
   }
 
-  /** Send a message to a channel/DM by conversation ID. */
-  async postMessage(conversationId: string, text: string): Promise<void> {
+  /** Send a message to a channel/DM by conversation ID. Returns the timestamp of the new message. */
+  async postMessage(conversationId: string, text: string): Promise<string> {
     const res = await this.call<never>('chat.postMessage', {
       channel: conversationId,
       text,
     });
     if (!res.ok) {
       throw new Error(explainError(res.error ?? 'unknown', res.needed));
+    }
+    return (res.message as { ts: string }).ts;
+  }
+
+  /** Mark a conversation as read up to a specific timestamp. */
+  async markAsRead(conversationId: string, ts: string): Promise<void> {
+    // Update local cache immediately to ensure UI reflects the read state instantly
+    SlackApiClient.lastReadCache.set(conversationId, ts);
+
+    const res = await this.call<never>('conversations.mark', {
+      channel: conversationId,
+      ts,
+    });
+    if (!res.ok) {
+      // conversations.mark can fail if the scope is missing or for certain channel types.
+      // We log but don't necessarily want to crash the message sending flow.
+      console.error(`[SlackApiClient] conversations.mark failed for ${conversationId}:`, res.error);
     }
   }
 }

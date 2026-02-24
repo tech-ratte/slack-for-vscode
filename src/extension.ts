@@ -8,7 +8,13 @@ export function activate(context: vscode.ExtensionContext) {
 
   const authManager = new SlackAuthManager(context.secrets);
   const slackProvider = new SlackTreeDataProvider(authManager);
-  const conversationView = new SlackConversationView(authManager);
+  const conversationView = new SlackConversationView(authManager, () => {
+    // Wait a very short bit just to ensure any UI state transitions are smooth.
+    // The actual read state is handled immediately by the client's cache.
+    setTimeout(() => {
+      slackProvider.refresh();
+    }, 100);
+  });
 
   const treeView = vscode.window.createTreeView('slackChannels', {
     treeDataProvider: slackProvider,
@@ -88,4 +94,4 @@ export function activate(context: vscode.ExtensionContext) {
   );
 }
 
-export function deactivate() {}
+export function deactivate() { }

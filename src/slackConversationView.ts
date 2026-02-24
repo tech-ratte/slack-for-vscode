@@ -40,7 +40,10 @@ export class SlackConversationView {
   private readonly panels = new Map<string, vscode.WebviewPanel>();
   private readonly userNameCache = new Map<string, string>();
 
-  constructor(private readonly authManager: SlackAuthManager) { }
+  constructor(
+    private readonly authManager: SlackAuthManager,
+    private readonly onMessageSent?: () => void,
+  ) { }
 
   async open(target: ConversationTarget): Promise<void> {
     const existing = this.panels.get(target.id);
@@ -110,8 +113,12 @@ export class SlackConversationView {
 
         try {
           const client = new SlackApiClient(token);
-          await client.postMessage(target.id, trimmed);
+          const ts = await client.postMessage(target.id, trimmed);
+          await client.markAsRead(target.id, ts);
           await panel.webview.postMessage({ type: 'sendMessageResult', ok: true });
+          if (this.onMessageSent) {
+            this.onMessageSent();
+          }
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : String(err);
           await panel.webview.postMessage({ type: 'sendMessageResult', ok: false, error: errorMessage });
