@@ -49,6 +49,12 @@
         "title": "Refresh Channels",
         "category": "Slack",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "slack-for-vscode.addDm",
+        "title": "Add DM",
+        "category": "Slack",
+        "icon": "$(person-add)"
       }
     ],
     "menus": {
@@ -67,6 +73,20 @@
           "command": "slack-for-vscode.clearToken",
           "when": "view == slackChannels",
           "group": "overflow"
+        }
+      ],
+      "view/item/inline": [
+        {
+          "command": "slack-for-vscode.removeDm",
+          "when": "view == slackChannels && viewItem == dm",
+          "group": "inline"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "slack-for-vscode.removeDm",
+          "when": "view == slackChannels && viewItem == dm",
+          "group": "1_modify"
         }
       ]
     }

@@ -1,19 +1,17 @@
 import * as vscode from 'vscode';
+import { SlackApiClient } from './slackApiClient';
 import { SlackAuthManager } from './slackAuthManager';
 import { ConversationTarget, SlackConversationView } from './slackConversationView';
-import { SlackTreeDataProvider } from './slackTreeDataProvider';
+import { SlackItem, SlackTreeDataProvider } from './slackTreeDataProvider';
 
-export function activate(context: vscode.ExtensionContext) {
+export function activate(context: vscode.ExtensionContext): void {
   console.log('Slack for VSCode is now active!');
 
   const authManager = new SlackAuthManager(context.secrets);
-  const slackProvider = new SlackTreeDataProvider(authManager);
+  const slackProvider = new SlackTreeDataProvider(authManager, context);
   const conversationView = new SlackConversationView(authManager, () => {
-    // Wait a very short bit just to ensure any UI state transitions are smooth.
-    // The actual read state is handled immediately by the client's cache.
-    setTimeout(() => {
-      slackProvider.refresh();
-    }, 100);
+    // Brief delay to let any UI transitions settle before refreshing unread counts.
+    setTimeout(() => slackProvider.refresh(), 100);
   });
 
   const treeView = vscode.window.createTreeView('slackChannels', {
@@ -21,8 +19,9 @@ export function activate(context: vscode.ExtensionContext) {
     showCollapseAll: true,
   });
 
-  // Command: Set Slack token
-  const setTokenCommand = vscode.commands.registerCommand(
+  // ── Commands ───────────────────────────────────────────────────────────────
+
+  const setTokenCmd = vscode.commands.registerCommand(
     'slack-for-vscode.setToken',
     async () => {
       const token = await vscode.window.showInputBox({
@@ -32,9 +31,7 @@ export function activate(context: vscode.ExtensionContext) {
         password: true,
         ignoreFocusOut: true,
         validateInput: (value) => {
-          if (!value || value.trim().length === 0) {
-            return 'Token cannot be empty.';
-          }
+          if (!value.trim()) { return 'Token cannot be empty.'; }
           if (!value.trim().startsWith('xoxp-') && !value.trim().startsWith('xoxb-')) {
             return 'Token should start with xoxp- (user token) or xoxb- (bot token).';
           }
@@ -50,8 +47,7 @@ export function activate(context: vscode.ExtensionContext) {
     },
   );
 
-  // Command: Clear Slack token
-  const clearTokenCommand = vscode.commands.registerCommand(
+  const clearTokenCmd = vscode.commands.registerCommand(
     'slack-for-vscode.clearToken',
     async () => {
       const confirm = await vscode.window.showWarningMessage(
@@ -67,31 +63,110 @@ export function activate(context: vscode.ExtensionContext) {
     },
   );
 
-  // Command: Refresh channels
-  const refreshCommand = vscode.commands.registerCommand(
+  const refreshCmd = vscode.commands.registerCommand(
     'slack-for-vscode.refreshChannels',
-    () => {
-      slackProvider.refresh();
+    () => slackProvider.refresh(),
+  );
+
+  const openConversationCmd = vscode.commands.registerCommand(
+    'slack-for-vscode.openConversation',
+    async (target: ConversationTarget | undefined) => {
+      if (!target?.id) { return; }
+      await conversationView.open(target);
     },
   );
 
-  const openConversationCommand = vscode.commands.registerCommand(
-    'slack-for-vscode.openConversation',
-    async (target: ConversationTarget | undefined) => {
-      if (!target?.id) {
+  /**
+   * Add DM command: shows a searchable QuickPick of workspace users,
+   * opens/retrieves the DM conversation, and persists the choice.
+   */
+  const addDmCmd = vscode.commands.registerCommand(
+    'slack-for-vscode.addDm',
+    async () => {
+      const token = await authManager.getToken();
+      if (!token) {
+        vscode.window.showErrorMessage('Slack token not set. Use "Slack: Set Token" first.');
         return;
       }
-      await conversationView.open(target);
+
+      const client = new SlackApiClient(token);
+
+      // Create a QuickPick so we can show a loading spinner while fetching
+      type UserPickItem = vscode.QuickPickItem & { userId: string };
+      const qp = vscode.window.createQuickPick<UserPickItem>();
+      qp.placeholder = 'Type a name to search users…';
+      qp.busy = true;
+      qp.ignoreFocusOut = true;
+      qp.matchOnDescription = true;
+      qp.show();
+
+      try {
+        const users = await client.listUsers();
+        qp.items = users.map((u) => ({
+          label: u.profile.display_name || u.real_name || u.name,
+          description: u.name,
+          userId: u.id,
+        }));
+      } catch (err) {
+        qp.hide();
+        vscode.window.showErrorMessage(
+          `Failed to load users: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        return;
+      } finally {
+        qp.busy = false;
+      }
+
+      qp.onDidAccept(async () => {
+        const selected = qp.selectedItems[0] as UserPickItem | undefined;
+        qp.hide();
+        if (!selected) { return; }
+
+        try {
+          const dmId = await client.openDMConversation(selected.userId);
+          await slackProvider.addDM(selected.userId, selected.label, dmId);
+        } catch (err) {
+          let message = err instanceof Error ? err.message : String(err);
+          
+          // Specific guidance for im:write scope error
+          if (message.includes('im:write')) {
+            message = 'Failed to add DM: The "im:write" scope is missing.\n\nTo fix this:\n1. Open your Slack App settings.\n2. Add "im:write" to User Token Scopes.\n3. Reinstall the app to your workspace.';
+          }
+          
+          vscode.window.showErrorMessage(message, { modal: true });
+        }
+      });
+
+      qp.onDidHide(() => qp.dispose());
+    },
+  );
+
+  /** Remove DM command: called from a tree item's inline/context menu button. */
+  const removeDmCmd = vscode.commands.registerCommand(
+    'slack-for-vscode.removeDm',
+    async (item: SlackItem | undefined) => {
+      if (!item?.userId) { return; }
+
+      const confirm = await vscode.window.showWarningMessage(
+        `Remove "${item.label}" from Direct Messages?`,
+        { modal: true },
+        'Remove',
+      );
+      if (confirm === 'Remove') {
+        await slackProvider.removeDM(item.userId);
+      }
     },
   );
 
   context.subscriptions.push(
     treeView,
-    setTokenCommand,
-    clearTokenCommand,
-    refreshCommand,
-    openConversationCommand,
+    setTokenCmd,
+    clearTokenCmd,
+    refreshCmd,
+    openConversationCmd,
+    addDmCmd,
+    removeDmCmd,
   );
 }
 
-export function deactivate() { }
+export function deactivate(): void {}
