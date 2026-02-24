@@ -142,6 +142,15 @@ export class SlackConversationView {
     try {
       const client = new SlackApiClient(token);
       const messages = await client.getConversationHistory(target.id, 50);
+      
+      // Mark as read when opening/rendering the latest messages
+      if (messages.length > 0) {
+        await client.markAsRead(target.id, messages[0].ts);
+        if (this.onMessageSent) {
+          this.onMessageSent(); // Trigger tree refresh
+        }
+      }
+
       const enriched = await this.enrichMessages(client, messages);
       panel.webview.html = this.getHtml(panel.webview, target, enriched, { canSend: true });
     } catch (err) {
