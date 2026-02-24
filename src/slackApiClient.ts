@@ -116,9 +116,6 @@ export class SlackApiClient {
   private readonly baseUrl = 'https://slack.com/api';
   private myUserId: string | undefined;
 
-  // Static cache to store the latest markAsRead timestamp per conversation ID.
-  private static lastReadCache = new Map<string, string>();
-
   constructor(private readonly token: string) { }
 
   private async call<T>(method: string, params: Record<string, string> = {}): Promise<SlackApiResponse<T>> {
@@ -142,60 +139,56 @@ export class SlackApiClient {
     };
   }
 
-  /** Fetch unread_count for a single conversation.
-   *  Strategy: conversations.info gives us unread_count (if scopes allow)
-   *  or last_read timestamp, then we count messages after that. */
-  private async getConversationUnreadCount(channelId: string): Promise<number> {
+  /** Fetch unread_count and message existence for a single conversation. */
+  private async getConversationStats(channelId: string): Promise<{ unreadCount: number; hasMessages: boolean }> {
     try {
-      // Step 1: get info (include_num_members can sometimes trigger unread_count return in some API versions)
+      // Step 1: get info for lastRead timestamp
       const infoRes = await this.call<never>('conversations.info', {
         channel: channelId,
         include_num_members: 'true',
       });
 
       if (!infoRes.ok) {
-        console.error(`[SlackApiClient] conversations.info failed for ${channelId}:`, infoRes.error);
-        return 0;
+        return { unreadCount: 0, hasMessages: false };
       }
 
       const channelData = (infoRes as any).channel;
-      let lastRead = channelData?.last_read;
+      const lastRead = channelData?.last_read;
 
-      // Check if we have a newer locally cached last_read timestamp
-      const cachedLastRead = SlackApiClient.lastReadCache.get(channelId);
-      if (cachedLastRead && (!lastRead || cachedLastRead > lastRead)) {
-        lastRead = cachedLastRead;
-      }
+      // Step 2: check if any message exists (limit 1 is enough)
+      const anyHistRes = await this.call<SlackMessage>('conversations.history', {
+        channel: channelId,
+        limit: '1',
+      });
+      const hasMessages = (anyHistRes.messages ?? []).length > 0;
 
-      // If no last_read, we can't compute unread via history.
-      // We'll treat it as 0 to avoid showing unreads for channels never visited.
       if (!lastRead) {
-        return 0;
+        return { unreadCount: 0, hasMessages };
       }
 
-      // Step 2: count messages after last_read
+      // Step 3: count messages after last_read for unread count
       const histRes = await this.call<SlackMessage>('conversations.history', {
         channel: channelId,
         oldest: lastRead,
-        limit: '100', // Limit to 100 for performance
+        limit: '100',
         inclusive: 'false',
       });
 
       if (!histRes.ok) {
-        console.error(`[SlackApiClient] conversations.history failed for ${channelId}:`, histRes.error);
-        return 0;
+        return { unreadCount: 0, hasMessages };
       }
 
       // Exclude system messages AND messages sent by the current user
-      const count = (histRes.messages ?? []).filter((m) => {
+      const unreadCount = (histRes.messages ?? []).filter((m) => {
         if (m.subtype) return false;
         if (this.myUserId && m.user === this.myUserId) return false;
         return true;
       }).length;
-      return count;
+
+      return { unreadCount, hasMessages };
     } catch (err) {
-      console.error(`[SlackApiClient] Error fetching unread count for ${channelId}:`, err);
-      return 0;
+      console.error(`[SlackApiClient] Error fetching stats for ${channelId}:`, err);
+      return { unreadCount: 0, hasMessages: false };
     }
   }
 
@@ -224,14 +217,19 @@ export class SlackApiClient {
       cursor = res.response_metadata?.next_cursor ?? '';
     } while (cursor);
 
-    // conversations.list does not return unread_count; fetch it per channel.
+    // Fetch unread_count and check message existence per channel.
+    const enrichedResults: SlackChannel[] = [];
     await Promise.all(
       results.map(async (ch) => {
-        ch.unread_count = await this.getConversationUnreadCount(ch.id);
+        const stats = await this.getConversationStats(ch.id);
+        if (stats.hasMessages) {
+          ch.unread_count = stats.unreadCount;
+          enrichedResults.push(ch);
+        }
       }),
     );
 
-    return results;
+    return enrichedResults;
   }
 
   /** Fetch all DM conversations. */
@@ -262,14 +260,19 @@ export class SlackApiClient {
       cursor = res.response_metadata?.next_cursor ?? '';
     } while (cursor);
 
-    // conversations.list does not return unread_count for IMs; fetch it per DM.
+    // Fetch unread_count and check message existence per DM.
+    const enrichedResults: SlackDM[] = [];
     await Promise.all(
       results.map(async (dm) => {
-        dm.unread_count = await this.getConversationUnreadCount(dm.id);
+        const stats = await this.getConversationStats(dm.id);
+        if (stats.hasMessages) {
+          dm.unread_count = stats.unreadCount;
+          enrichedResults.push(dm);
+        }
       }),
     );
 
-    return results;
+    return enrichedResults;
   }
 
   /** Resolve a user ID to a display name. */
@@ -308,9 +311,6 @@ export class SlackApiClient {
 
   /** Mark a conversation as read up to a specific timestamp. */
   async markAsRead(conversationId: string, ts: string): Promise<void> {
-    // Update local cache immediately to ensure UI reflects the read state instantly
-    SlackApiClient.lastReadCache.set(conversationId, ts);
-
     const res = await this.call<never>('conversations.mark', {
       channel: conversationId,
       ts,
