@@ -40,7 +40,7 @@ export class SlackConversationView {
   private readonly panels = new Map<string, vscode.WebviewPanel>();
   private readonly userNameCache = new Map<string, string>();
 
-  constructor(private readonly authManager: SlackAuthManager) {}
+  constructor(private readonly authManager: SlackAuthManager) { }
 
   async open(target: ConversationTarget): Promise<void> {
     const existing = this.panels.get(target.id);
@@ -220,15 +220,24 @@ export class SlackConversationView {
         --error: var(--vscode-errorForeground);
       }
 
-      body {
+      html, body {
+        height: 100%;
         margin: 0;
         padding: 0;
+        overflow: hidden;
+      }
+
+      body {
         color: var(--fg);
         background: var(--bg);
         font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        height: 100vh;
         display: flex;
         flex-direction: column;
+        box-sizing: border-box;
+      }
+
+      * {
+        box-sizing: border-box;
       }
 
       .topbar {
@@ -324,6 +333,7 @@ export class SlackConversationView {
       }
 
       .composer {
+        flex-shrink: 0;
         border-top: 1px solid var(--border);
         padding: 10px 12px;
         display: grid;
@@ -332,6 +342,7 @@ export class SlackConversationView {
         gap: 8px;
         align-items: center;
         background: color-mix(in srgb, var(--bg) 96%, black);
+        min-height: 80px;
       }
 
       textarea {
@@ -413,7 +424,12 @@ export class SlackConversationView {
 
       function setComposeError(message) {
         if (errorEl) errorEl.textContent = message || '';
+        if (message) console.error('[SlackView] Compose error:', message);
       }
+
+      console.log('[SlackView] Initializing webview...');
+      console.log('[SlackView] Composer element:', !!document.querySelector('.composer'));
+      console.log('[SlackView] Can send:', ${!!options?.canSend});
 
       function sendCurrent() {
         if (!textarea || textarea.disabled) return;

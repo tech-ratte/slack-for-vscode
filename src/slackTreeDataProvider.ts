@@ -184,9 +184,9 @@ export class SlackTreeDataProvider implements vscode.TreeDataProvider<SlackItem>
 
       this._channels = channels.sort((a, b) => a.name.localeCompare(b.name));
 
-      // Resolve DM user names in parallel (limit to 20 to avoid rate limits)
+      // Resolve DM user names in parallel
       const resolvedDMs = await Promise.all(
-        dms.slice(0, 20).map(async (dm) => {
+        dms.map(async (dm) => {
           try {
             dm.userName = await client.getUserName(dm.user);
           } catch {

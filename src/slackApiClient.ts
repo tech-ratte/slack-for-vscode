@@ -104,7 +104,7 @@ function explainError(error: string, needed?: string): string {
 export class SlackApiClient {
   private readonly baseUrl = 'https://slack.com/api';
 
-  constructor(private readonly token: string) {}
+  constructor(private readonly token: string) { }
 
   private async call<T>(method: string, params: Record<string, string> = {}): Promise<SlackApiResponse<T>> {
     const body = new URLSearchParams(params).toString();
@@ -207,7 +207,6 @@ export class SlackApiClient {
         ch.unread_count = await this.getConversationUnreadCount(ch.id);
       }),
     );
-    console.log(`[SlackApiClient] Fetched ${results.length} channels with unread counts.`);
 
     return results;
   }
@@ -231,8 +230,9 @@ export class SlackApiClient {
       if (!res.ok) {
         throw new Error(explainError(res.error ?? 'unknown', res.needed));
       }
-      console.log(res);
-      for (const im of res.channels ?? []) {
+
+      const ims = (res.channels || res.ims || []) as any[];
+      for (const im of ims) {
         results.push({ id: im.id, user: im.user, unread_count: im.unread_count });
       }
 
@@ -245,7 +245,6 @@ export class SlackApiClient {
         dm.unread_count = await this.getConversationUnreadCount(dm.id);
       }),
     );
-    console.log(`[SlackApiClient] Fetched ${results.length} DMs with unread counts.`);
 
     return results;
   }
