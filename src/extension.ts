@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { SlackApiClient } from './slackApiClient';
 import { SlackAuthManager } from './slackAuthManager';
 import { ConversationTarget, SlackConversationView } from './slackConversationView';
+import { SlackNotificationManager } from './slackNotificationManager';
 import { SlackItem, SlackTreeDataProvider } from './slackTreeDataProvider';
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -9,10 +10,15 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const authManager = new SlackAuthManager(context.secrets);
   const slackProvider = new SlackTreeDataProvider(authManager, context);
+  const notificationManager = new SlackNotificationManager(authManager, context);
+  
   const conversationView = new SlackConversationView(authManager, () => {
     // Brief delay to let any UI transitions settle before refreshing unread counts.
     setTimeout(() => slackProvider.refresh(), 100);
   });
+
+  // Start background notifications
+  notificationManager.start();
 
   const treeView = vscode.window.createTreeView('slackChannels', {
     treeDataProvider: slackProvider,
