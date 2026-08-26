@@ -33,7 +33,7 @@ export function activate(context: vscode.ExtensionContext): void {
       const token = await vscode.window.showInputBox({
         title: 'Slack: Set User Token',
         prompt: 'Enter your Slack User Token (xoxp-...)',
-        placeHolder: 'xoxp-xxxxxxxxxxxx-xxxxxxxxxxxx-xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+        placeHolder: 'xoxp-... (User OAuth Token)',
         password: true,
         ignoreFocusOut: true,
         validateInput: (value) => {

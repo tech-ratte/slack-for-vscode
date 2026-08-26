@@ -2,7 +2,14 @@
   "name": "slack-for-vscode",
   "displayName": "Slack for VSCode",
   "description": "Use Slack inside VS Code",
-  "version": "0.0.1",
+  "version": "1.0.0",
+  "publisher": "tech-ratte",
+  "license": "MIT",
+  "icon": "images/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tech-ratte/slack-for-vscode.git"
+  },
   "engines": {
     "vscode": "^1.109.0"
   },
