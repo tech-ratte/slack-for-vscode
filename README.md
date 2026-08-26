@@ -1,5 +1,7 @@
 # Slack for VSCode
 
+[Slack for VSCode](https://marketplace.visualstudio.com/items?itemName=tech-ratte.slack-for-vscode)
+
 VS Code / Cursor のサイドバーから、参加中の Slack チャンネルとダイレクトメッセージを閲覧・送受信するための非公式拡張機能です。Slack, Inc. の公式製品ではありません。
 
 トークンは VS Code の Secret Storage に保存します。リポジトリや設定ファイルには書き込みません。
